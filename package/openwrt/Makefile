@@ -6,15 +6,15 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=smartdns
-PKG_VERSION:=1.2019.28
+PKG_VERSION:=1.2019.28-lite
 PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL:=https://www.github.com/pymumu/smartdns.git
-PKG_SOURCE_VERSION:=982002e836e486fb4e360bc10e84e7e7197caf46
-PKG_MIRROR_HASH:=ae889b521ecf114660ce5597af5c361f5970a7dcb75dadf61b938ba3d2baba54
+PKG_SOURCE_URL:=https://www.github.com/coolexa/smartdns-lite.git
+PKG_SOURCE_VERSION:=76247c44445f585e740fa76a8b4211525ef2472b
+PKG_MIRROR_HASH:=a83dbeea6deb140d4900ea59efc41cbd0e84f9fa4fb590e8702907bc434eb8a3
 
-PKG_MAINTAINER:=Nick Peng <pymumu@gmail.com>
+PKG_MAINTAINER:=coolexa <coolexa@outlook.com>
 PKG_LICENSE:=GPL-3.0-or-later
 PKG_LICENSE_FILES:=LICENSE
 
@@ -29,7 +29,7 @@ define Package/smartdns
   SECTION:=net
   CATEGORY:=Network
   TITLE:=smartdns server
-  DEPENDS:=+libpthread +libopenssl
+  DEPENDS:=+libpthread
   URL:=https://www.github.com/pymumu/smartdns/
 endef
 
