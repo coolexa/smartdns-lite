@@ -67,6 +67,7 @@ int ipset_add(const char *ipsetname, const unsigned char addr[], int addr_len, u
 
 int ipset_del(const char *ipsetname, const unsigned char addr[], int addr_len);
 
+#ifdef SSL
 void SSL_CRYPTO_thread_setup(void);
 
 void SSL_CRYPTO_thread_cleanup(void);
@@ -74,6 +75,7 @@ void SSL_CRYPTO_thread_cleanup(void);
 unsigned char *SSL_SHA256(const unsigned char *d, size_t n, unsigned char *md);
 
 int SSL_base64_decode(const char *in, unsigned char *out);
+#endif
 
 int create_pid_file(const char *pid_file);
 

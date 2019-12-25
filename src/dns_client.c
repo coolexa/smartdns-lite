@@ -39,8 +39,10 @@
 #include <netinet/ip6.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/tcp.h>
+#ifdef SSL
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#endif
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -105,9 +107,11 @@ struct dns_server_info {
 	int fd;
 	int ttl;
 	int ttl_range;
+#ifdef SSL
 	SSL *ssl;
 	SSL_CTX *ssl_ctx;
 	SSL_SESSION *ssl_session;
+#endif
 	dns_server_status status;
 
 	struct dns_server_buff send_buff;
@@ -637,6 +641,7 @@ static void _dns_client_group_remove_all(void)
 	}
 }
 
+#ifdef SSL
 int dns_client_spki_decode(const char *spki, unsigned char *spki_data_out)
 {
 	int spki_data_len = -1;
@@ -711,6 +716,7 @@ static char *_dns_client_server_get_spki(struct dns_server_info *server_info, in
 
 	return spki;
 }
+#endif
 
 /* add dns server information */
 static int _dns_client_server_add(char *server_ip, char *server_host, int port, dns_server_type_t server_type, struct client_dns_server_flags *flags)
@@ -734,6 +740,7 @@ static int _dns_client_server_add(char *server_ip, char *server_host, int port, 
 
 		sock_type = SOCK_DGRAM;
 	} break;
+#ifdef SSL
 	case DNS_SERVER_HTTPS: {
 		struct client_dns_server_flag_https *flag_https = &flags->https;
 		spki_data_len = flag_https->spi_len;
@@ -751,6 +758,7 @@ static int _dns_client_server_add(char *server_ip, char *server_host, int port, 
 		spki_data_len = flag_tls->spi_len;
 		sock_type = SOCK_STREAM;
 	} break;
+#endif
 	case DNS_SERVER_TCP:
 		sock_type = SOCK_STREAM;
 		break;
@@ -805,6 +813,7 @@ static int _dns_client_server_add(char *server_ip, char *server_host, int port, 
 		}
 	}
 
+#ifdef SSL
 	/* if server type is TLS, create ssl context */
 	if (server_type == DNS_SERVER_TLS || server_type == DNS_SERVER_HTTPS) {
 #if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
@@ -817,6 +826,7 @@ static int _dns_client_server_add(char *server_ip, char *server_host, int port, 
 			goto errout;
 		}
 	}
+#endif
 
 	/* safe address info */
 	if (gai->ai_addrlen > sizeof(server_info->in6)) {
@@ -853,10 +863,12 @@ static int _dns_client_server_add(char *server_ip, char *server_host, int port, 
 	return 0;
 errout:
 	if (server_info) {
+#ifdef SSL
 		if (server_info->ssl_ctx) {
 			SSL_CTX_free(server_info->ssl_ctx);
 			server_info->ssl_ctx = NULL;
 		}
+#endif
 		if (server_info->ping_host) {
 			fast_ping_stop(server_info->ping_host);
 		}
@@ -877,12 +889,14 @@ static void _dns_client_close_socket(struct dns_server_info *server_info)
 		return;
 	}
 
+#ifdef SSL
 	if (server_info->ssl) {
 		/* Shutdown ssl */
 		SSL_shutdown(server_info->ssl);
 		SSL_free(server_info->ssl);
 		server_info->ssl = NULL;
 	}
+#endif
 
 	/* remove fd from epoll */
 	epoll_ctl(client.epoll_fd, EPOLL_CTL_DEL, server_info->fd, NULL);
@@ -907,6 +921,7 @@ static void _dns_client_server_close(struct dns_server_info *server_info)
 
 	_dns_client_close_socket(server_info);
 
+#ifdef SSL
 	if (server_info->ssl_session) {
 		SSL_SESSION_free(server_info->ssl_session);
 		server_info->ssl_session = NULL;
@@ -916,6 +931,7 @@ static void _dns_client_server_close(struct dns_server_info *server_info)
 		SSL_CTX_free(server_info->ssl_ctx);
 		server_info->ssl_ctx = NULL;
 	}
+#endif
 }
 
 /* remove all servers information */
@@ -1437,6 +1453,7 @@ errout:
 	return -1;
 }
 
+#ifdef SSL
 static int _DNS_client_create_socket_tls(struct dns_server_info *server_info, char *hostname)
 {
 	int fd = 0;
@@ -1528,6 +1545,7 @@ errout:
 
 	return -1;
 }
+#endif
 
 static int _dns_client_create_socket(struct dns_server_info *server_info)
 {
@@ -1542,6 +1560,7 @@ static int _dns_client_create_socket(struct dns_server_info *server_info)
 		return _dns_client_create_socket_udp(server_info);
 	} else if (server_info->type == DNS_SERVER_TCP) {
 		return _DNS_client_create_socket_tcp(server_info);
+#ifdef SSL
 	} else if (server_info->type == DNS_SERVER_TLS) {
 		struct client_dns_server_flag_tls *flag_tls;
 		flag_tls = &server_info->flags.tls;
@@ -1550,6 +1569,7 @@ static int _dns_client_create_socket(struct dns_server_info *server_info)
 		struct client_dns_server_flag_https *flag_https;
 		flag_https = &server_info->flags.https;
 		return _DNS_client_create_socket_tls(server_info, flag_https->hostname);
+#endif
 	} else {
 		return -1;
 	}
@@ -1615,6 +1635,7 @@ static int _dns_client_process_udp(struct dns_server_info *server_info, struct e
 	return 0;
 }
 
+#ifdef SSL
 static int _dns_client_socket_ssl_send(SSL *ssl, const void *buf, int num)
 {
 	int ret = 0;
@@ -1728,6 +1749,7 @@ static int _dns_client_socket_ssl_recv(SSL *ssl, void *buf, int num)
 
 	return ret;
 }
+#endif
 
 static int _dns_client_socket_send(struct dns_server_info *server_info)
 {
@@ -1735,8 +1757,10 @@ static int _dns_client_socket_send(struct dns_server_info *server_info)
 		return -1;
 	} else if (server_info->type == DNS_SERVER_TCP) {
 		return send(server_info->fd, server_info->send_buff.data, server_info->send_buff.len, MSG_NOSIGNAL);
+#ifdef SSL
 	} else if (server_info->type == DNS_SERVER_TLS || server_info->type == DNS_SERVER_HTTPS) {
 		return _dns_client_socket_ssl_send(server_info->ssl, server_info->send_buff.data, server_info->send_buff.len);
+#endif
 	} else {
 		return -1;
 	}
@@ -1748,9 +1772,11 @@ static int _dns_client_socket_recv(struct dns_server_info *server_info)
 		return -1;
 	} else if (server_info->type == DNS_SERVER_TCP) {
 		return recv(server_info->fd, server_info->recv_buff.data + server_info->recv_buff.len, DNS_TCP_BUFFER - server_info->recv_buff.len, 0);
+#ifdef SSL
 	} else if (server_info->type == DNS_SERVER_TLS || server_info->type == DNS_SERVER_HTTPS) {
 		return _dns_client_socket_ssl_recv(server_info->ssl, server_info->recv_buff.data + server_info->recv_buff.len,
 										   DNS_TCP_BUFFER - server_info->recv_buff.len);
+#endif
 	} else {
 		return -1;
 	}
@@ -1984,6 +2010,7 @@ static int _dns_client_tls_matchName(const char *host, const char *pattern, int 
 	return match;
 }
 
+#ifdef SSL
 static int _dns_client_tls_verify(struct dns_server_info *server_info)
 {
 	X509 *cert = NULL;
@@ -2162,6 +2189,7 @@ errout:
 
 	return -1;
 }
+#endif
 
 static int _dns_client_process(struct dns_server_info *server_info, struct epoll_event *event, unsigned long now)
 {
@@ -2171,9 +2199,11 @@ static int _dns_client_process(struct dns_server_info *server_info, struct epoll
 	} else if (server_info->type == DNS_SERVER_TCP) {
 		/* receive from tcp */
 		return _dns_client_process_tcp(server_info, event, now);
+#ifdef SSL
 	} else if (server_info->type == DNS_SERVER_TLS || server_info->type == DNS_SERVER_HTTPS) {
 		/* recive from tls */
 		return _dns_client_process_tls(server_info, event, now);
+#endif
 	} else {
 		return -1;
 	}
@@ -2262,6 +2292,7 @@ static int _dns_client_send_tcp(struct dns_server_info *server_info, void *packe
 	return 0;
 }
 
+#ifdef SSL
 static int _dns_client_send_tls(struct dns_server_info *server_info, void *packet, unsigned short len)
 {
 	int send_len = 0;
@@ -2354,6 +2385,7 @@ static int _dns_client_send_https(struct dns_server_info *server_info, void *pac
 
 	return 0;
 }
+#endif
 
 static int _dns_client_send_packet(struct dns_query_struct *query, void *packet, int len)
 {
@@ -2389,6 +2421,7 @@ static int _dns_client_send_packet(struct dns_query_struct *query, void *packet,
 			ret = _dns_client_send_tcp(server_info, packet, len);
 			send_err = errno;
 			break;
+#ifdef SSL
 		case DNS_SERVER_TLS:
 			/* tls query */
 			ret = _dns_client_send_tls(server_info, packet, len);
@@ -2399,6 +2432,7 @@ static int _dns_client_send_packet(struct dns_query_struct *query, void *packet,
 			ret = _dns_client_send_https(server_info, packet, len);
 			send_err = errno;
 			break;
+#endif
 		default:
 			/* unsupport query type */
 			ret = -1;

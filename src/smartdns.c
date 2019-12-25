@@ -31,8 +31,10 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <libgen.h>
+#ifdef SSL
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#endif
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -151,6 +153,7 @@ static int _smartdns_add_servers(void)
 			struct client_dns_server_flag_udp *flag_udp = &flags.udp;
 			flag_udp->ttl = dns_conf_servers[i].ttl;
 		} break;
+#ifdef SSL
 		case DNS_SERVER_HTTPS: {
 			struct client_dns_server_flag_https *flag_http = &flags.https;
 			flag_http->spi_len = dns_client_spki_decode(dns_conf_servers[i].spki, (unsigned char *)flag_http->spki);
@@ -165,6 +168,7 @@ static int _smartdns_add_servers(void)
 			safe_strncpy(flag_tls->hostname, dns_conf_servers[i].hostname, sizeof(flag_tls->hostname));
 			safe_strncpy(flag_tls->tls_host_verify, dns_conf_servers[i].tls_host_verify, sizeof(flag_tls->tls_host_verify));
 		} break;
+#endif
 		case DNS_SERVER_TCP:
 			break;
 		default:
@@ -220,6 +224,7 @@ static int _smartdns_set_ecs_ip(void)
 	return ret;
 }
 
+#ifdef SSL
 static int _smartdns_init_ssl(void)
 {
 	SSL_load_error_strings();
@@ -238,6 +243,7 @@ static int _smartdns_destroy_ssl(void)
 
 	return 0;
 }
+#endif
 
 static int _smartdns_init(void)
 {
@@ -259,10 +265,12 @@ static int _smartdns_init(void)
 
 	tlog(TLOG_NOTICE, "smartdns starting...(Copyright (C) Nick Peng <pymumu@gmail.com>, build:%s %s)", __DATE__, __TIME__);
 
+#ifdef SSL
 	if (_smartdns_init_ssl() != 0) {
 		tlog(TLOG_ERROR, "init ssl failed.");
 		goto errout;
 	}
+#endif
 
 	if (dns_conf_server_num <= 0) {
 		if (_smartdns_load_from_resolv() != 0) {
@@ -315,7 +323,9 @@ static void _smartdns_exit(void)
 	dns_server_exit();
 	dns_client_exit();
 	fast_ping_exit();
+#ifdef SSL
 	_smartdns_destroy_ssl();
+#endif
 	tlog_exit();
 	dns_server_load_exit();
 }
