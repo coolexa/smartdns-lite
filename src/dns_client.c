@@ -1067,7 +1067,7 @@ static void _dns_client_query_release(struct dns_query_struct *query)
 
 	/* notify caller query end */
 	if (query->callback) {
-		query->callback(query->domain, DNS_QUERY_END, 0, NULL, NULL, 0, query->user_ptr);
+		query->callback(query->domain, DNS_QUERY_END, 0, NULL, NULL, 0, query->user_ptr, NULL);
 	}
 
 	/* free resource */
@@ -1317,7 +1317,7 @@ static int _dns_client_recv(struct dns_server_info *server_info, unsigned char *
 
 	/* notify caller dns query result */
 	if (query->callback) {
-		ret = query->callback(query->domain, DNS_QUERY_RESULT, server_info->flags.result_flag, packet, inpacket, inpacket_len, query->user_ptr);
+		ret = query->callback(query->domain, DNS_QUERY_RESULT, server_info->flags.result_flag, packet, inpacket, inpacket_len, query->user_ptr, query->server_group->group_name);
 		if (request_num == 0 || ret) {
 			/* if all server replied, or done, stop query, release resource */
 			_dns_client_query_remove(query);

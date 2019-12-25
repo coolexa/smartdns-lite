@@ -1241,7 +1241,7 @@ static int _dns_server_is_adblock_ipv6(unsigned char addr[16])
 	return -1;
 }
 
-static int _dns_server_process_answer_A(struct dns_rrs *rrs, struct dns_request *request, char *domain, unsigned int result_flag, int ping_timeout)
+static int _dns_server_process_answer_A(struct dns_rrs *rrs, struct dns_request *request, char *domain, unsigned int result_flag, int ping_timeout, const char *group_name)
 {
 	int ttl;
 	int ip_check_result = 0;
@@ -1304,6 +1304,16 @@ static int _dns_server_process_answer_A(struct dns_rrs *rrs, struct dns_request 
 		return -1;
 	}
 
+	/* skip check speed */
+	if (request->check_order_list->order[0] != DOMAIN_CHECK_NONE || request->check_order_list->order[1] != DOMAIN_CHECK_NONE) {
+		if (strncmp(group_name, "proxy", 5) == 0) {
+			tlog(TLOG_DEBUG, "---- skip check speed");
+			request->has_ping_result = 1; //request->has_ping_tcp = 1;
+			_dns_server_request_release(request);
+			return 0;
+		}
+	}
+
 	sprintf(ip, "%d.%d.%d.%d", addr[0], addr[1], addr[2], addr[3]);
 
 	/* start ping */
@@ -1314,7 +1324,7 @@ static int _dns_server_process_answer_A(struct dns_rrs *rrs, struct dns_request 
 	return 0;
 }
 
-static int _dns_server_process_answer_AAAA(struct dns_rrs *rrs, struct dns_request *request, char *domain, unsigned int result_flag, int ping_timeout)
+static int _dns_server_process_answer_AAAA(struct dns_rrs *rrs, struct dns_request *request, char *domain, unsigned int result_flag, int ping_timeout, const char *group_name)
 {
 	unsigned char addr[16];
 	char name[DNS_MAX_CNAME_LEN] = {0};
@@ -1374,6 +1384,16 @@ static int _dns_server_process_answer_AAAA(struct dns_rrs *rrs, struct dns_reque
 		return -1;
 	}
 
+	/* skip check speed */
+	if (request->check_order_list->order[0] != DOMAIN_CHECK_NONE || request->check_order_list->order[1] != DOMAIN_CHECK_NONE) {
+		if (strncmp(group_name, "proxy", 5) == 0) {
+			tlog(TLOG_DEBUG, "---- skip check speed");
+			request->has_ping_result = 1; //request->has_ping_tcp = 1;
+			_dns_server_request_release(request);
+			return 0;
+		}
+	}
+
 	sprintf(ip, "[%.2x%.2x:%.2x%.2x:%.2x%.2x:%.2x%.2x:%.2x%.2x:%.2x%.2x:%.2x%.2x:%.2x%.2x]", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5], addr[6],
 			addr[7], addr[8], addr[9], addr[10], addr[11], addr[12], addr[13], addr[14], addr[15]);
 
@@ -1385,7 +1405,7 @@ static int _dns_server_process_answer_AAAA(struct dns_rrs *rrs, struct dns_reque
 	return 0;
 }
 
-static int _dns_server_process_answer(struct dns_request *request, char *domain, struct dns_packet *packet, unsigned int result_flag)
+static int _dns_server_process_answer(struct dns_request *request, char *domain, struct dns_packet *packet, unsigned int result_flag, const char *group_name)
 {
 	int ttl;
 	char name[DNS_MAX_CNAME_LEN] = {0};
@@ -1418,7 +1438,7 @@ static int _dns_server_process_answer(struct dns_request *request, char *domain,
 		for (i = 0; i < rr_count && rrs; i++, rrs = dns_get_rrs_next(packet, rrs)) {
 			switch (rrs->type) {
 			case DNS_T_A: {
-				ret = _dns_server_process_answer_A(rrs, request, domain, result_flag, ping_timeout);
+				ret = _dns_server_process_answer_A(rrs, request, domain, result_flag, ping_timeout, group_name);
 				if (ret == -1) {
 					break;
 				} else if (ret == -2) {
@@ -1427,7 +1447,7 @@ static int _dns_server_process_answer(struct dns_request *request, char *domain,
 				request->rcode = packet->head.rcode;
 			} break;
 			case DNS_T_AAAA: {
-				ret = _dns_server_process_answer_AAAA(rrs, request, domain, result_flag, ping_timeout);
+				ret = _dns_server_process_answer_AAAA(rrs, request, domain, result_flag, ping_timeout, group_name);
 				if (ret == -1) {
 					break;
 				} else if (ret == -2) {
@@ -1582,7 +1602,7 @@ static int _dns_server_reply_passthrouth(struct dns_request *request, struct dns
 }
 
 static int dns_server_resolve_callback(char *domain, dns_result_type rtype, unsigned int result_flag, struct dns_packet *packet, unsigned char *inpacket,
-									   int inpacket_len, void *user_ptr)
+									   int inpacket_len, void *user_ptr, const char *group_name)
 {
 	struct dns_request *request = user_ptr;
 	int ip_num = 0;
@@ -1603,7 +1623,7 @@ static int dns_server_resolve_callback(char *domain, dns_result_type rtype, unsi
 			return _dns_server_reply_passthrouth(request, packet, inpacket, inpacket_len);
 		}
 
-		_dns_server_process_answer(request, domain, packet, result_flag);
+		_dns_server_process_answer(request, domain, packet, result_flag, group_name);
 		return 0;
 	} else if (rtype == DNS_QUERY_ERR) {
 		tlog(TLOG_ERROR, "request faield, %s", domain);

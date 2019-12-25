@@ -53,7 +53,7 @@ int dns_client_set_ecs(char *ip, int subnet);
 
 /* query result notify function */
 typedef int (*dns_client_callback)(char *domain, dns_result_type rtype, unsigned int result_flag, struct dns_packet *packet, unsigned char *inpacket,
-								   int inpacket_len, void *user_ptr);
+								   int inpacket_len, void *user_ptr, const char *group_name);
 
 /* query domain */
 int dns_client_query(char *domain, int qtype, dns_client_callback callback, void *user_ptr, const char *group_name);
